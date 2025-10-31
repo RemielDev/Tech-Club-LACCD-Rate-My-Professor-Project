@@ -4,11 +4,9 @@ A Chrome extension that automatically displays Rate My Professor ratings next to
 
 ## Features
 
-- 🎯 **Automatic Detection**: Identifies professor names on LACCD course search pages
-- ⭐ **Live Ratings**: Shows current Rate My Professor ratings and number of reviews
-- 🎨 **Color-Coded**: Visual indicators (green for high ratings, yellow for medium, red for low)
-- 🔗 **Direct Links**: Click ratings to view full professor profiles on Rate My Professor
-- 🏫 **All LACCD Campuses**: Supports all 9 LACCD colleges:
+-  **Automatic Detection**: Identifies professor names on LACCD course search pages
+-  **Direct Links**: Click ratings to view full professor profiles on Rate My Professor
+-  **All LACCD Campuses**: Supports all 9 LACCD colleges:
   - Los Angeles Pierce College (LAPC)
   - Los Angeles City College (LACC)
   - Los Angeles Harbor College (LAHC)
@@ -23,36 +21,25 @@ A Chrome extension that automatically displays Rate My Professor ratings next to
 
 ### Load as Unpacked Extension (For Development/Testing)
 
-1. **Download/Clone this repository**
-   ```bash
-   git clone <repository-url>
-   cd laccd-rmp-extension
-   ```
+1. **download/Clone repo**
 
-2. **Open Chrome Extensions Page**
+2. **open chrome extensions page**
    - Navigate to `chrome://extensions/`
    - Or click Menu → More Tools → Extensions
 
-3. **Enable Developer Mode**
+3. **enable developer mode**
    - Toggle the "Developer mode" switch in the top-right corner
 
-4. **Load the Extension**
-   - Click "Load unpacked"
-   - Select the extension folder (containing manifest.json)
+4. **load the Eextension**
+   - click "Load unpacked"
+   - select the extension folder (containing manifest.json)
 
-5. **Verify Installation**
-   - You should see "LACCD Rate My Professor" in your extensions list
-   - The extension icon should appear in your toolbar
+5. **verify Installation**
+   - you should see "LACCD Rate My Professor" in your extensions list
+   - the extension icon should appear in your toolbar
 
-## Usage
-
-1. **Visit LACCD Course Search**
-   - Go to [LACCD Course Search](https://mycollege-guest.laccd.edu/psc/classsearchguest/EMPLOYEE/HRMS/c/COMMUNITY_ACCESS.CLASS_SEARCH.GBL)
-   - Select your campus and search for courses
-
-2. **Click for Details**
-   - Click any rating to open the professor's full Rate My Professor profile
-   - View detailed reviews, difficulty ratings, and more
+## only working for [LACCD Course Search](https://mycollege-guest.laccd.edu/psc/classsearchguest/EMPLOYEE/HRMS/c/COMMUNITY_ACCESS.CLASS_SEARCH.GBL)
+(FOR NOW)
 
 ## How It Works
 
@@ -63,15 +50,9 @@ A Chrome extension that automatically displays Rate My Professor ratings next to
    - Detects and extracts professor names from the page
    - Injects rating buttons next to each name
 
-2. **Background Service Worker** (`background.js`)
-   - Handles Rate My Professor API requests
-   - Caches results to minimize API calls
-   - Maps LACCD campuses to RMP school IDs
-
-3. **Rate My Professor Integration**
+2. **Rate My Professor Integration**
    - Uses RMP's GraphQL API for professor searches
    - Matches professors by name and school
-   - Retrieves ratings, review counts, and would-take-again percentages
 
 ### Campus Mapping
 
@@ -94,33 +75,14 @@ const LACCD_SCHOOLS = {
 - `storage`: Cache professor search results
 - `host_permissions`: Access LACCD and RMP websites
 
-### Technologies
-- Vanilla JavaScript (no external dependencies)
-- Chrome Extension APIs
-- GraphQL for RMP data
-
 ### Caching
 - Professor searches are cached for 24 hours
 - Reduces API calls and improves performance
 - Cache is stored in memory (clears on extension restart)
-
-## Edge Cases Handled
-
-- ✅ Professors listed as "Staff" or "TBA" are ignored
-- ✅ New professors without RMP profiles show "Not Found"
-- ✅ Name variations (FirstName LastName, LastName FirstName)
-- ✅ Titles removed (Dr., Prof., Mr., Ms., Mrs.)
-- ✅ Dynamic content loading on page navigation
-- ✅ Multiple professors with similar names (best match algorithm)
-
-## Troubleshooting
-
+- 
 ### Ratings Not Appearing?
 
-1. **Wait a Few Seconds**: Extension needs time to load after page renders
-2. **Refresh the Page**: Try reloading the course search results
-3. **Check Console**: Open DevTools (F12) → Console for error messages
-4. **Verify URL**: Make sure you're on the correct LACCD course search page
+1. **be patient, like 5-seconds typa patient or refresh**
 
 ### "Not Found" for Known Professors?
 
@@ -151,19 +113,6 @@ laccd-rmp-extension/
 │   └── icon128.png
 └── README.md             # This file
 ```
-
-### Making Changes
-
-1. Edit the relevant files
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on the extension card
-4. Reload the LACCD page to see changes
-
-### Debugging
-
-- **Content Script**: Check the page's DevTools console
-- **Background Script**: Go to `chrome://extensions/` → Details → Inspect views: service worker
-- **Network Requests**: Monitor Network tab in DevTools
 
 ## Privacy & Data
 
@@ -204,5 +153,5 @@ For issues, questions, or suggestions, please open an issue on the GitHub reposi
 
 ---
 
-**Made with ❤️ for LACCD students**
+**Made by Tech Club ❤️**
 
