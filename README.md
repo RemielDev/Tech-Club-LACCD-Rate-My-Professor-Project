@@ -50,12 +50,7 @@ A Chrome extension that automatically displays Rate My Professor ratings next to
    - Go to [LACCD Course Search](https://mycollege-guest.laccd.edu/psc/classsearchguest/EMPLOYEE/HRMS/c/COMMUNITY_ACCESS.CLASS_SEARCH.GBL)
    - Select your campus and search for courses
 
-2. **View Ratings**
-   - Ratings will automatically appear next to instructor names
-   - Format: ⭐ X.X/5 (Y ratings)
-   - Wait a moment for the extension to fetch data
-
-3. **Click for Details**
+2. **Click for Details**
    - Click any rating to open the professor's full Rate My Professor profile
    - View detailed reviews, difficulty ratings, and more
 

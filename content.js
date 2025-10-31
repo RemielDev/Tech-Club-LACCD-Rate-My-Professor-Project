@@ -9,61 +9,80 @@ function getCurrentCampus() {
   return urlParams.get('Campus') || 'LAPC';
 }
 
+// Extract campus from the Room column text (more accurate)
+function getCampusFromRoom(professorElement) {
+  // Find the row containing this professor
+  const row = professorElement.closest('tr');
+  if (!row) return null;
+  
+  // Look for the Room cell in this row
+  const roomCell = row.querySelector('span[id^="MTG_ROOM$"]');
+  if (!roomCell) return null;
+  
+  const roomText = roomCell.textContent.trim();
+  console.log(`[LACCD RMP] Room text: ${roomText}`);
+  
+  // Map room prefix to campus code
+  if (roomText.includes('City-')) return 'LACC';
+  if (roomText.includes('EAST-')) return 'ELAC';
+  if (roomText.includes('Harbor-')) return 'LAHC';
+  if (roomText.includes('Pierce-')) return 'LAPC';
+  if (roomText.includes('Valley-')) return 'LAVC';
+  if (roomText.includes('West-')) return 'WLAC';
+  if (roomText.includes('Mission-')) return 'LAMC';
+  if (roomText.includes('Southwest-')) return 'LASC';
+  if (roomText.includes('Trade-')) return 'LATC';
+  
+  return null;
+}
+
 // Find professor name elements on the page
 function findProfessorElements() {
   // The LACCD site uses PeopleSoft/Oracle structure
-  // Professor names are typically in specific table cells or span elements
+  // Instructor names are in spans with id="MTG_INSTR$X" and class="PSLONGEDITBOX"
   
   const professorElements = [];
   const processedIds = new Set();
   
-  // Strategy 1: Look for instructor name spans (most common pattern in PeopleSoft)
-  const instructorSpans = document.querySelectorAll('span[id*="DERIVED_SSR_FC_SSR_INSTR_LONG"], span[id*="MTG_INSTR"]');
+  // Primary strategy: Look for MTG_INSTR spans (this is the correct selector!)
+  const instructorSpans = document.querySelectorAll('span[id^="MTG_INSTR$"]');
+  console.log(`[LACCD RMP] Found ${instructorSpans.length} MTG_INSTR spans`);
+  
   instructorSpans.forEach(span => {
     const text = span.textContent.trim();
+    console.log(`[LACCD RMP] Checking span ${span.id}: "${text}"`);
+    
     if (text && text !== 'TBA' && text !== 'Staff' && text !== '') {
       // Avoid duplicates
       if (!processedIds.has(span.id)) {
         processedIds.add(span.id);
         professorElements.push(span);
+        console.log(`[LACCD RMP] Added professor: ${text}`);
       }
+    } else {
+      console.log(`[LACCD RMP] Skipped (TBA/Staff/empty): ${text}`);
     }
   });
   
-  // Strategy 2: Look for table cells with instructor information
-  const instructorCells = document.querySelectorAll('td.PAGROUPDIVIDER, td.PSLEVEL1GRIDROW, td[id*="win0divSSR_CLSRCH_MTG"]');
-  instructorCells.forEach(cell => {
-    // Look for cells that contain "Instructor:" label or instructor names
-    if (cell.textContent.includes('Instructor:') || cell.textContent.includes('Instr:')) {
-      const nameSpans = cell.querySelectorAll('span');
-      nameSpans.forEach(nameSpan => {
-        const text = nameSpan.textContent.trim();
-        if (text && text !== 'TBA' && text !== 'Staff' && text !== 'Instructor:' && text !== 'Instr:') {
-          if (!processedIds.has(nameSpan.id)) {
-            processedIds.add(nameSpan.id);
-            professorElements.push(nameSpan);
+  // Fallback: Look for any PSLONGEDITBOX spans in instructor divs
+  if (professorElements.length === 0) {
+    console.log('[LACCD RMP] Primary method found 0, trying fallback...');
+    const instructorDivs = document.querySelectorAll('div[id*="MTG_INSTR"]');
+    instructorDivs.forEach(div => {
+      const spans = div.querySelectorAll('span.PSLONGEDITBOX');
+      spans.forEach(span => {
+        const text = span.textContent.trim();
+        if (text && text !== 'TBA' && text !== 'Staff' && text !== '') {
+          if (!processedIds.has(span.id)) {
+            processedIds.add(span.id);
+            professorElements.push(span);
           }
         }
       });
-    }
-  });
-  
-  // Strategy 3: Look for specific instructor div structures
-  const instructorDivs = document.querySelectorAll('div[id*="win0divSSR_CLSRCH_MTG"]');
-  instructorDivs.forEach(div => {
-    const spans = div.querySelectorAll('span.PSLONGEDITBOX');
-    spans.forEach(span => {
-      const text = span.textContent.trim();
-      if (text && text !== 'TBA' && text !== 'Staff') {
-        if (!processedIds.has(span.id)) {
-          processedIds.add(span.id);
-          professorElements.push(span);
-        }
-      }
     });
-  });
+  }
 
-  console.log(`[LACCD RMP] Found ${professorElements.length} professor elements`);
+  console.log(`[LACCD RMP] Total found: ${professorElements.length} professor elements`);
   return professorElements;
 }
 
@@ -92,30 +111,41 @@ function updateRMPButton(button, data) {
     button.rel = 'noopener noreferrer';
     button.style.pointerEvents = 'auto';
     
-    const rating = data.rating ? data.rating.toFixed(1) : 'N/A';
-    const numRatings = data.numRatings || 0;
-    
-    // Color code based on rating
-    let color = '#999';
-    if (data.rating >= 4.0) {
-      color = '#4CAF50'; // Green
-    } else if (data.rating >= 3.0) {
-      color = '#FFC107'; // Yellow/Orange
-    } else if (data.rating > 0) {
-      color = '#F44336'; // Red
+    if (data.isSearchLink) {
+      // This is a search link (no API data available)
+      button.innerHTML = `🔍 Search RMP`;
+      button.style.color = '#2196F3'; // Blue
+      button.style.fontWeight = 'bold';
+      button.title = `Search for ${data.professorName} at ${data.schoolName} on Rate My Professor`;
+    } else {
+      // This would be API data (if we had it)
+      const rating = data.rating ? data.rating.toFixed(1) : 'N/A';
+      const numRatings = data.numRatings || 0;
+      
+      // Color code based on rating
+      let color = '#999';
+      if (data.rating >= 4.0) {
+        color = '#4CAF50'; // Green
+      } else if (data.rating >= 3.0) {
+        color = '#FFC107'; // Yellow/Orange
+      } else if (data.rating > 0) {
+        color = '#F44336'; // Red
+      }
+      
+      button.innerHTML = `⭐ ${rating}/5 (${numRatings} ratings)`;
+      button.style.color = color;
+      button.style.fontWeight = 'bold';
+      button.title = `View ${button.getAttribute('data-professor')} on Rate My Professor`;
     }
-    
-    button.innerHTML = `⭐ ${rating}/5 (${numRatings} ratings)`;
-    button.style.color = color;
-    button.style.fontWeight = 'bold';
-    button.title = `View ${button.getAttribute('data-professor')} on Rate My Professor`;
     
     // Add hover effect
     button.addEventListener('mouseenter', () => {
       button.style.textDecoration = 'underline';
+      button.style.transform = 'scale(1.05)';
     });
     button.addEventListener('mouseleave', () => {
       button.style.textDecoration = 'none';
+      button.style.transform = 'scale(1)';
     });
   } else {
     button.innerHTML = '❓ Not Found';
@@ -156,8 +186,14 @@ async function processProfessor(element) {
     element.appendChild(button);
   }
   
-  // Get campus
-  const campus = getCurrentCampus();
+  // Get campus - try from Room column first, fallback to URL
+  let campus = getCampusFromRoom(element);
+  if (!campus) {
+    campus = getCurrentCampus();
+    console.log(`[LACCD RMP] Using campus from URL: ${campus}`);
+  } else {
+    console.log(`[LACCD RMP] Using campus from Room column: ${campus}`);
+  }
   
   // Search for professor
   try {
@@ -197,33 +233,38 @@ async function processAllProfessors() {
 
 // Initialize when page is ready
 function initialize() {
-  // Wait a bit for the page to fully render
+  console.log('[LACCD RMP] Initializing extension...');
+  
+  // Initial check
   setTimeout(() => {
+    console.log('[LACCD RMP] Running initial professor search...');
     processAllProfessors();
-    
-    // Set up observer for dynamic content
-    const observer = new MutationObserver((mutations) => {
-      let shouldReprocess = false;
-      
-      for (const mutation of mutations) {
-        if (mutation.addedNodes.length > 0) {
-          shouldReprocess = true;
-          break;
-        }
-      }
-      
-      if (shouldReprocess) {
-        processAllProfessors();
-      }
-    });
-    
-    // Observe the main content area
-    const mainContent = document.querySelector('#win0divPSPAGECONTAINER') || document.body;
-    observer.observe(mainContent, {
-      childList: true,
-      subtree: true
-    });
   }, 2000);
+  
+  // Set up observer for dynamic content and page changes
+  const observer = new MutationObserver((mutations) => {
+    // Check if search results appeared
+    const hasResults = document.querySelector('span[id^="MTG_INSTR$"]');
+    const resultsContainer = document.querySelector('#win0divSSR_CLSRSLT_WRK_GROUPBOX1');
+    
+    if (hasResults || resultsContainer) {
+      // Debounce: only process if we haven't processed recently
+      if (!window.lastProcessTime || (Date.now() - window.lastProcessTime > 1000)) {
+        console.log('[LACCD RMP] Detected new content, processing professors...');
+        window.lastProcessTime = Date.now();
+        setTimeout(processAllProfessors, 500);
+      }
+    }
+  });
+  
+  // Observe the main content area for any changes
+  const mainContent = document.querySelector('#win0divPSPAGECONTAINER') || document.body;
+  observer.observe(mainContent, {
+    childList: true,
+    subtree: true
+  });
+  
+  console.log('[LACCD RMP] Observer set up, watching for changes...');
 }
 
 // Start when DOM is ready
@@ -233,13 +274,33 @@ if (document.readyState === 'loading') {
   initialize();
 }
 
-// Re-process when user performs a search (listen for URL changes)
-let lastUrl = location.href;
-new MutationObserver(() => {
-  const url = location.href;
-  if (url !== lastUrl) {
-    lastUrl = url;
-    setTimeout(processAllProfessors, 2000);
+// Listen for search button clicks (PeopleSoft uses submitAction_win0)
+document.addEventListener('click', (e) => {
+  const target = e.target;
+  
+  // Check if search button was clicked
+  if (target && (
+    target.id === 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH' || 
+    target.name === 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH'
+  )) {
+    console.log('[LACCD RMP] Search button clicked! Waiting for results...');
+    
+    // Check multiple times as results load
+    setTimeout(() => processAllProfessors(), 2000);
+    setTimeout(() => processAllProfessors(), 4000);
+    setTimeout(() => processAllProfessors(), 6000);
   }
-}).observe(document, { subtree: true, childList: true });
+}, true);
+
+// Periodically check for professors on results page (fallback)
+setInterval(() => {
+  // Only run if we see the results container but haven't processed yet
+  const resultsContainer = document.querySelector('#win0divSSR_CLSRSLT_WRK_GROUPBOX1');
+  const hasUnprocessedProfs = document.querySelector('span[id^="MTG_INSTR$"]:not([data-rmp-processed])');
+  
+  if (resultsContainer && hasUnprocessedProfs) {
+    console.log('[LACCD RMP] Periodic check found unprocessed professors');
+    processAllProfessors();
+  }
+}, 3000);
 
