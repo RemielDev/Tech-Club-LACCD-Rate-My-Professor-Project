@@ -36,3 +36,18 @@ works on the laccd course search page:
 ## license and disclaimer
 
 open source for educational use. not affiliated with laccd or rate my professor.
+
+
+## FLOW
+
+Plugin Flow
+Page loads → script marks itself ready (window.laccdRmpExtension = true) → waits 2s → runs processAllProfessors().
+processAllProfessors() → gathers instructor name spans (findProfessorElements) → for each name: createRMPButton → insert button beside name → figure out campus (room column first, URL fallback) → chrome.runtime.sendMessage with {action: 'searchProfessor', name, campus} → background replies → updateRMPButton sets final label/link based on response.
+
+Keeping Results Fresh
+DOM changes detected → MutationObserver fires → throttles and reruns processAllProfessors.
+User hits “Search” button → click listener waits 2/4/6s → reruns processAllProfessors.
+Every 3s → interval checks for unprocessed names → reruns processAllProfessors if needed.
+
+Per-Professor Flow
+Professor span found → button starts as “Loading…” → message sent to background → response success → button becomes RateMyProfessors link; failure → button shows fallback message.
