@@ -1,7 +1,18 @@
-// Content script for LACCD course search page
+// Content script for LACCD course search pages (guest and SIS portal)
 
 // Mark that extension is loaded
 window.laccdRmpExtension = true;
+
+// Detect which LACCD system we're on
+function detectSystem() {
+  const hostname = window.location.hostname;
+  if (hostname.includes('mycollege-guest.laccd.edu')) {
+    return 'GUEST_SEARCH';
+  } else if (hostname.includes('csprd.laccd.edu')) {
+    return 'SIS_PORTAL';
+  }
+  return 'UNKNOWN';
+}
 
 // Extract campus from URL
 function getCurrentCampus() {
@@ -11,12 +22,32 @@ function getCurrentCampus() {
 
 // Extract campus from the Room column text (more accurate)
 function getCampusFromRoom(professorElement) {
-  // Find the row containing this professor
+  // Find the row or container
   const row = professorElement.closest('tr');
-  if (!row) return null;
+  const container = professorElement.closest('.ps_box-scrollarea-row') || 
+                    professorElement.closest('.ps_grid-row') ||
+                    professorElement.closest('[class*="STDNT_ENRL"]');
   
-  // Look for the Room cell in this row
-  const roomCell = row.querySelector('span[id^="MTG_ROOM$"]');
+  const searchContext = row || container || professorElement.closest('div');
+  if (!searchContext) return null;
+  
+  // Look for room information in various formats
+  // Guest search: span[id^="MTG_ROOM$"]
+  // SIS portal: span containing room info or divs with room data
+  let roomCell = searchContext.querySelector('span[id^="MTG_ROOM$"], span[id*="ROOM"], span[id*="SSR_DRV_ROOM"]');
+  
+  // Also check text content of nearby elements
+  if (!roomCell) {
+    const allSpans = searchContext.querySelectorAll('span.ps_box-value, span[id*="DERIVED_SSR"]');
+    for (const span of allSpans) {
+      const text = span.textContent.trim();
+      if (text.match(/City-|EAST-|Harbor-|Pierce-|Valley-|West-|Mission-|Southwest-|Trade-/i)) {
+        roomCell = span;
+        break;
+      }
+    }
+  }
+  
   if (!roomCell) return null;
   
   const roomText = roomCell.textContent.trim();
@@ -38,6 +69,20 @@ function getCampusFromRoom(professorElement) {
 
 // Find professor name elements on the page
 function findProfessorElements() {
+  const system = detectSystem();
+  console.log(`[LACCD RMP] System detected: ${system}`);
+  
+  if (system === 'GUEST_SEARCH') {
+    return findProfessorElementsGuestSearch();
+  } else if (system === 'SIS_PORTAL') {
+    return findProfessorElementsSISPortal();
+  }
+  
+  return [];
+}
+
+// Find professors on guest search page
+function findProfessorElementsGuestSearch() {
   // The LACCD site uses PeopleSoft/Oracle structure
   // Instructor names are in spans with id="MTG_INSTR$X" and class="PSLONGEDITBOX"
   
@@ -83,6 +128,73 @@ function findProfessorElements() {
   }
 
   console.log(`[LACCD RMP] Total found: ${professorElements.length} professor elements`);
+  return professorElements;
+}
+
+// Find professors on SIS portal pages
+function findProfessorElementsSISPortal() {
+  const professorElements = [];
+  const processedIds = new Set();
+  
+  // Strategy 1: Look for instructor names in class detail sections
+  // These appear when you expand class details in "View My Classes/Schedule"
+  const instructorSpans = document.querySelectorAll('span[id*="INSTR"], span[id*="INSTRNAME"]');
+  console.log(`[LACCD RMP] [SIS] Found ${instructorSpans.length} potential instructor spans`);
+  
+  instructorSpans.forEach(span => {
+    const text = span.textContent.trim();
+    console.log(`[LACCD RMP] [SIS] Checking span ${span.id}: "${text}"`);
+    
+    if (text && text !== 'TBA' && text !== 'Staff' && text !== '' && text !== 'Instructor') {
+      // Avoid duplicates
+      if (!processedIds.has(span.id)) {
+        processedIds.add(span.id);
+        professorElements.push(span);
+        console.log(`[LACCD RMP] [SIS] Added professor: ${text}`);
+      }
+    }
+  });
+  
+  // Strategy 2: Look for SSR_CLS_DTL instructor fields (class search results)
+  const detailInstructors = document.querySelectorAll('span[id^="SSR_CLS_DTL_WRK_INSTRNAME"], span[id^="MTG_INSTR"]');
+  console.log(`[LACCD RMP] [SIS] Found ${detailInstructors.length} class detail instructor spans`);
+  
+  detailInstructors.forEach(span => {
+    const text = span.textContent.trim();
+    if (text && text !== 'TBA' && text !== 'Staff' && text !== '') {
+      if (!processedIds.has(span.id)) {
+        processedIds.add(span.id);
+        professorElements.push(span);
+        console.log(`[LACCD RMP] [SIS] Added professor from details: ${text}`);
+      }
+    }
+  });
+  
+  // Strategy 3: Look in expanded class details (after clicking "More" or class links)
+  const expandedSections = document.querySelectorAll('.ps_box-value, .ps-text');
+  expandedSections.forEach(element => {
+    // Look for elements that might contain instructor info
+    const text = element.textContent.trim();
+    const parent = element.parentElement;
+    
+    // Check if this looks like an instructor field
+    if (parent && (
+      parent.id.includes('INSTR') || 
+      element.previousElementSibling?.textContent?.includes('Instructor')
+    )) {
+      if (text && text !== 'TBA' && text !== 'Staff' && text !== '' && text.length > 3) {
+        const elemId = element.id || `generated-${professorElements.length}`;
+        if (!processedIds.has(elemId)) {
+          processedIds.add(elemId);
+          element.id = elemId; // Assign ID if it doesn't have one
+          professorElements.push(element);
+          console.log(`[LACCD RMP] [SIS] Added professor from expanded: ${text}`);
+        }
+      }
+    }
+  });
+  
+  console.log(`[LACCD RMP] [SIS] Total found: ${professorElements.length} professor elements`);
   return professorElements;
 }
 
@@ -233,21 +345,33 @@ async function processAllProfessors() {
 
 // Initialize when page is ready
 function initialize() {
-  console.log('[LACCD RMP] Initializing extension...');
+  const system = detectSystem();
+  console.log(`[LACCD RMP] Initializing extension for ${system}...`);
   
-  // Initial check
+  // Initial check - longer delay for SIS portal due to complex page load
+  const initialDelay = system === 'SIS_PORTAL' ? 3000 : 2000;
   setTimeout(() => {
     console.log('[LACCD RMP] Running initial professor search...');
     processAllProfessors();
-  }, 2000);
+  }, initialDelay);
   
   // Set up observer for dynamic content and page changes
   const observer = new MutationObserver((mutations) => {
-    // Check if search results appeared
-    const hasResults = document.querySelector('span[id^="MTG_INSTR$"]');
-    const resultsContainer = document.querySelector('#win0divSSR_CLSRSLT_WRK_GROUPBOX1');
+    // Check if content with instructors appeared
+    let hasResults = false;
     
-    if (hasResults || resultsContainer) {
+    if (system === 'GUEST_SEARCH') {
+      hasResults = document.querySelector('span[id^="MTG_INSTR$"]') || 
+                   document.querySelector('#win0divSSR_CLSRSLT_WRK_GROUPBOX1');
+    } else if (system === 'SIS_PORTAL') {
+      // Check for various SIS portal instructor containers
+      hasResults = document.querySelector('span[id*="INSTR"]') ||
+                   document.querySelector('span[id*="SSR_CLS_DTL"]') ||
+                   document.querySelector('.ps_box-scrollarea[id*="DETAILS"]') ||
+                   document.querySelector('[id*="STDNT_ENRL"]');
+    }
+    
+    if (hasResults) {
       // Debounce: only process if we haven't processed recently
       if (!window.lastProcessTime || (Date.now() - window.lastProcessTime > 1000)) {
         console.log('[LACCD RMP] Detected new content, processing professors...');
@@ -258,7 +382,9 @@ function initialize() {
   });
   
   // Observe the main content area for any changes
-  const mainContent = document.querySelector('#win0divPSPAGECONTAINER') || document.body;
+  const mainContent = document.querySelector('#win0divPSPAGECONTAINER') || 
+                      document.querySelector('#PT_CONTENT') ||
+                      document.body;
   observer.observe(mainContent, {
     childList: true,
     subtree: true
@@ -274,29 +400,69 @@ if (document.readyState === 'loading') {
   initialize();
 }
 
-// Listen for search button clicks (PeopleSoft uses submitAction_win0)
+// Listen for clicks that might reveal instructor information
 document.addEventListener('click', (e) => {
   const target = e.target;
+  const system = detectSystem();
   
-  // Check if search button was clicked
-  if (target && (
-    target.id === 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH' || 
-    target.name === 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH'
-  )) {
-    console.log('[LACCD RMP] Search button clicked! Waiting for results...');
+  if (system === 'GUEST_SEARCH') {
+    // Check if search button was clicked on guest search
+    if (target && (
+      target.id === 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH' || 
+      target.name === 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH'
+    )) {
+      console.log('[LACCD RMP] Search button clicked! Waiting for results...');
+      
+      // Check multiple times as results load
+      setTimeout(() => processAllProfessors(), 2000);
+      setTimeout(() => processAllProfessors(), 4000);
+      setTimeout(() => processAllProfessors(), 6000);
+    }
+  } else if (system === 'SIS_PORTAL') {
+    // Check if class detail link was clicked (reveals instructor info)
+    const targetElement = target.closest('a, .ps-link');
+    if (targetElement && (
+      targetElement.id?.includes('SSR_SBJ_CAT_NBR') ||
+      targetElement.id?.includes('SCRTAB_DTLS') ||
+      targetElement.classList.contains('ps_header-group') ||
+      targetElement.textContent?.includes('Class#')
+    )) {
+      console.log('[LACCD RMP] Class detail link clicked! Waiting for details...');
+      
+      // Check multiple times as details expand
+      setTimeout(() => processAllProfessors(), 1000);
+      setTimeout(() => processAllProfessors(), 2000);
+      setTimeout(() => processAllProfessors(), 3000);
+    }
     
-    // Check multiple times as results load
-    setTimeout(() => processAllProfessors(), 2000);
-    setTimeout(() => processAllProfessors(), 4000);
-    setTimeout(() => processAllProfessors(), 6000);
+    // Check for search or filter buttons in SIS portal
+    if (target && (
+      target.id?.includes('SEARCH') ||
+      target.id?.includes('SSR_PB_GO') ||
+      target.textContent?.trim() === 'Search'
+    )) {
+      console.log('[LACCD RMP] SIS search button clicked! Waiting for results...');
+      setTimeout(() => processAllProfessors(), 2000);
+      setTimeout(() => processAllProfessors(), 4000);
+    }
   }
 }, true);
 
 // Periodically check for professors on results page (fallback)
 setInterval(() => {
-  // Only run if we see the results container but haven't processed yet
-  const resultsContainer = document.querySelector('#win0divSSR_CLSRSLT_WRK_GROUPBOX1');
-  const hasUnprocessedProfs = document.querySelector('span[id^="MTG_INSTR$"]:not([data-rmp-processed])');
+  const system = detectSystem();
+  let resultsContainer, hasUnprocessedProfs;
+  
+  if (system === 'GUEST_SEARCH') {
+    // Only run if we see the results container but haven't processed yet
+    resultsContainer = document.querySelector('#win0divSSR_CLSRSLT_WRK_GROUPBOX1');
+    hasUnprocessedProfs = document.querySelector('span[id^="MTG_INSTR$"]:not([data-rmp-processed])');
+  } else if (system === 'SIS_PORTAL') {
+    // Check for SIS portal containers with unprocessed instructors
+    resultsContainer = document.querySelector('[id*="STDNT_ENRL"], [id*="SSR_CLS_DTL"], .ps_box-scrollarea');
+    hasUnprocessedProfs = document.querySelector('span[id*="INSTR"]:not([data-rmp-processed])') ||
+                          document.querySelector('.ps_box-value:not([data-rmp-processed])');
+  }
   
   if (resultsContainer && hasUnprocessedProfs) {
     console.log('[LACCD RMP] Periodic check found unprocessed professors');

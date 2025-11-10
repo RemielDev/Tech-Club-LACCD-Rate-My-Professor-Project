@@ -8,12 +8,22 @@
   ],
   "host_permissions": [
     "https://*.ratemyprofessors.com/*",
-    "https://mycollege-guest.laccd.edu/*"
+    "https://mycollege-guest.laccd.edu/*",
+    "https://csprd.laccd.edu/*"
   ],
   "content_scripts": [
     {
       "matches": [
         "https://mycollege-guest.laccd.edu/psc/classsearchguest/EMPLOYEE/HRMS/c/COMMUNITY_ACCESS.CLASS_SEARCH.GBL*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://csprd.laccd.edu/psc/csprd/EMPLOYEE/SA/c/*.GBL*",
+        "https://csprd.laccd.edu/psc/csprd/EMPLOYEE/SA/s/*.GBL*"
       ],
       "js": ["content.js"],
       "css": ["styles.css"],
