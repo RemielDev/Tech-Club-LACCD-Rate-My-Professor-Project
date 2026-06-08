@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  <sub>Built with the <strong>LACCD Tech Club</strong>, led by <a href="https://github.com/RemielDev">@RemielDev</a> as Club President.</sub>
+</p>
+
+<p align="center">
   <img alt="Chrome" src="https://img.shields.io/badge/Chrome%20extension-0e0f14?style=for-the-badge&labelColor=0e0f14&color=60a5fa" />
   <img alt="LACCD" src="https://img.shields.io/badge/All%209%20LACCD%20colleges-0e0f14?style=for-the-badge&labelColor=0e0f14&color=1d4ed8" />
 </p>
@@ -63,9 +67,13 @@ Shows Rate My Professor ratings next to instructor names on LACCD course search 
 * No personal data collected
 * Processing happens locally in your browser
 
+## Credits
+
+Built collaboratively with the **LACCD Tech Club** while [@RemielDev](https://github.com/RemielDev) served as Club President. Thanks to every Tech Club member who helped test against the nine campuses and the SIS Portal quirks.
+
 ## License and disclaimer
 
-Open source for educational use. Not affiliated with LACCD or Rate My Professor.
+Open source for educational use. Not officially affiliated with LACCD or Rate My Professor.
 
 ## Flow
 
